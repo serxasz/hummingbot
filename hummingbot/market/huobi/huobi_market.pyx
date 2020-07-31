@@ -65,7 +65,7 @@ from hummingbot.core.utils.estimate_fee import estimate_fee
 hm_logger = None
 s_decimal_0 = Decimal(0)
 TRADING_PAIR_SPLITTER = re.compile(r"^(\w+)(usdt|husd|btc|eth|ht|trx)$")
-HUOBI_ROOT_API = "https://api.huobi.pro/v1/"
+HUOBI_ROOT_API = "https://api.huobi.pro/v1"
 
 
 class HuobiAPIError(IOError):
@@ -240,7 +240,7 @@ cdef class HuobiMarket(MarketBase):
 
     async def check_network(self) -> NetworkStatus:
         try:
-            await self._api_request(method="get", path_url="common/timestamp")
+            await self._api_request(method="get", path_url="/common/timestamp")
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -280,7 +280,7 @@ cdef class HuobiMarket(MarketBase):
         if isinstance(client, TestClient):
             response_coro = client.request(
                 method=method.upper(),
-                path=f"/{path_url}",
+                path=f"{path_url}",
                 headers=headers,
                 params=params,
                 data=ujson.dumps(data),
@@ -311,7 +311,7 @@ cdef class HuobiMarket(MarketBase):
             return data
 
     async def _update_account_id(self) -> str:
-        accounts = await self._api_request("get", path_url="account/accounts", is_auth_required=True)
+        accounts = await self._api_request("get", path_url="/account/accounts", is_auth_required=True)
         try:
             for account in accounts:
                 if account["state"] == "working" and account["type"] == "spot":
@@ -321,7 +321,7 @@ cdef class HuobiMarket(MarketBase):
 
     async def _update_balances(self):
         cdef:
-            str path_url = f"account/accounts/{self._account_id}/balance"
+            str path_url = f"/account/accounts/{self._account_id}/balance"
             dict data
             list balances
             dict new_available_balances = {}
@@ -376,7 +376,7 @@ cdef class HuobiMarket(MarketBase):
             int64_t last_tick = <int64_t>(self._last_timestamp / 60.0)
             int64_t current_tick = <int64_t>(self._current_timestamp / 60.0)
         if current_tick > last_tick or len(self._trading_rules) < 1:
-            exchange_info = await self._api_request("get", path_url="common/symbols")
+            exchange_info = await self._api_request("get", path_url="/common/symbols")
             trading_rules_list = self._format_trading_rules(exchange_info)
             self._trading_rules.clear()
             for trading_rule in trading_rules_list:
@@ -424,7 +424,7 @@ cdef class HuobiMarket(MarketBase):
             "batch": ""
         }
         """
-        path_url = f"order/orders/{exchange_order_id}"
+        path_url = f"/order/orders/{exchange_order_id}"
         return await self._api_request("get", path_url=path_url, is_auth_required=True)
 
     async def _update_order_status(self):
@@ -601,7 +601,7 @@ cdef class HuobiMarket(MarketBase):
                           is_buy: bool,
                           order_type: OrderType,
                           price: Decimal) -> str:
-        path_url = "order/orders/place"
+        path_url = "/order/orders/place"
         side = "buy" if is_buy else "sell"
         if order_type is OrderType.LIMIT:
             order_type_str = "limit"
@@ -789,7 +789,7 @@ cdef class HuobiMarket(MarketBase):
             tracked_order = self._in_flight_orders.get(order_id)
             if tracked_order is None:
                 raise ValueError(f"Failed to cancel order - {order_id}. Order not found.")
-            path_url = f"order/orders/{tracked_order.exchange_order_id}/submitcancel"
+            path_url = f"/order/orders/{tracked_order.exchange_order_id}/submitcancel"
             response = await self._api_request("post", path_url=path_url, is_auth_required=True)
 
         except HuobiAPIError as e:
@@ -828,7 +828,7 @@ cdef class HuobiMarket(MarketBase):
             return []
         cancel_order_ids = [o.exchange_order_id for o in open_orders]
         self.logger().debug(f"cancel_order_ids {cancel_order_ids} {open_orders}")
-        path_url = "order/orders/batchcancel"
+        path_url = "/order/orders/batchcancel"
         params = {"order-ids": ujson.dumps(cancel_order_ids)}
         data = {"order-ids": cancel_order_ids}
         cancellation_results = []

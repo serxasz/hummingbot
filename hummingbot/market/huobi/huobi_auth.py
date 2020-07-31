@@ -25,20 +25,35 @@ class HuobiAuth:
     def add_auth_to_params(self,
                            method: str,
                            path_url: str,
-                           args: Dict[str, Any]=None) -> Dict[str, Any]:
+                           args: Dict[str, Any] = None,
+                           is_ws: bool = False) -> Dict[str, Any]:
         timestamp: str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-        request = {
+        params = {
             "AccessKeyId": self.api_key,
             "SignatureMethod": "HmacSHA256",
-            "SignatureVersion": "2",
+            "SignatureVersion": "2" if not is_ws else "2.1",
             "Timestamp": timestamp
         }
         if args is not None:
-            request.update(args)
-        sorted_request = self.keysort(request)
-        query_string = urlencode(sorted_request)
-        payload = "\n".join([method.upper(), self.hostname, "/v1/" + path_url, query_string])
+            params.update(args)
+
+        sorted_params = self.keysort(params)
+        sorted_params["Signature"] = self.generate_signature(method=method,
+                                                             path_url=path_url,
+                                                             params=sorted_params,
+                                                             is_ws=is_ws)
+        return sorted_params
+
+    def generate_signature(self,
+                           method: str,
+                           path_url: str,
+                           params: Dict[str, Any],
+                           is_ws: bool = False) -> str:
+
+        query_endpoint = f"/v1{path_url}" if not is_ws else "/ws/v2"
+        encoded_params_str = urlencode(params)
+        payload = "\n".join([method.upper(), self.hostname, query_endpoint, encoded_params_str])
         signature = hmac.new(self.secret_key.encode("utf8"), payload.encode("utf8"), hashlib.sha256)
         signature_b64 = base64.b64encode(signature.digest()).decode("utf8")
-        sorted_request["Signature"] = signature_b64
-        return sorted_request
+
+        return signature_b64
