@@ -213,7 +213,7 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         for trading_pair in trading_pairs:
                             subscribe_request: Dict[str, Any] = {
                                 "e": "market",
-                                "subscription": "full",
+                                "type": "bot",
                                 "chartInterval": "1m",
                                 "marketId": self._symbol_map[trading_pair]
                             }
@@ -256,7 +256,7 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
                         for trading_pair in trading_pairs:
                             subscribe_request: Dict[str, Any] = {
                                 "e": "market",
-                                "subscription": "full",
+                                "type": "bot",
                                 "chartInterval": "1m",
                                 "marketId": self._symbol_map[trading_pair]
                             }
