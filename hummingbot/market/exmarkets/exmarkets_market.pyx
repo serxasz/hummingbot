@@ -315,9 +315,9 @@ cdef class ExmarketsMarket(MarketBase):
             except Exception:
                 raise IOError(f"Error parsing data from {url}.")
 
-            data = parsed_response.get("data")
+            data = parsed_response
             if data is None:
-                self.logger().error(f"Error received from {url}. Response is {parsed_response}.")
+                self.logger().error(f"Error received from {url}. Response is {data}.")
                 raise ExmarketsAPIError({"error": parsed_response})
             return data
 
