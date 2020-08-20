@@ -142,8 +142,8 @@ cdef class ExmarketsMarket(MarketBase):
     @staticmethod
     def split_trading_pair(trading_pair: str) -> Optional[Tuple[str, str]]:
         try:
-            m = TRADING_PAIR_SPLITTER.match(trading_pair)
-            return m.group(1), m.group(2)
+            m = trading_pair.split('-')
+            return m[0], m[1]
         # Exceptions are now logged as warnings in trading pair fetcher
         except Exception as e:
             return None
