@@ -388,10 +388,10 @@ cdef class ExmarketsMarket(MarketBase):
                                 min_price_increment=Decimal(f"1e-{info['price_precision']}"),
                                 min_base_amount_increment=Decimal(f"1e-{info['quote_precision']}"),
                                 min_quote_amount_increment=Decimal(f"1e-{info['quote_precision']}"),
-                                min_notional_size=Decimal(info["min_amount"]) * Decimal(info["last_price"]))
+                                min_notional_size=Decimal(info["min_amount"]) * Decimal(info["last_price"] if info["last_price"] else 0))
                 )
-            except Exception:
-                self.logger().error(f"Error parsing the trading pair rule {info}. Skipping.", exc_info=True)
+            except Exception as e:
+                self.logger().error(f"Error parsing the trading pair rule {info}. Exception: {str(e)}. Skipping.", exc_info=True)
         return trading_rules
 
     async def get_order_status(self, exchange_order_id: str) -> Dict[str, Any]:

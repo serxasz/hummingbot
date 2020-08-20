@@ -235,53 +235,13 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
                                 output.put_nowait(order_book_message)
                 except asyncio.CancelledError:
                     raise
-                except Exception:
-                    self.logger().error("Unexpected error with WebSocket connection. Retrying after 30 seconds...",
+                except Exception as e:
+                    self.logger().error(f"Unexpected error with WebSocket connection ({str(e)}). Retrying after 30 seconds...",
                                         exc_info=True)
                     await asyncio.sleep(30.0)
 
     async def listen_for_order_book_diffs(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
-        if (self._ws_running is False):
-            self._ws_running = True
-            while True:
-                try:
-                    trading_pairs: List[str] = await self.get_trading_pairs()
-                    async with websockets.connect(EXMARKETS_WS_URI) as ws:
-                        ws: websockets.WebSocketClientProtocol = ws
-                        subscribe_request: Dict[str, Any] = {
-                            "e": "init"
-                        }
-                        await ws.send(json.dumps(subscribe_request))
-
-                        for trading_pair in trading_pairs:
-                            subscribe_request: Dict[str, Any] = {
-                                "e": "market",
-                                "type": "bot",
-                                "chartInterval": "1m",
-                                "marketId": self._symbol_map[trading_pair]
-                            }
-                            await ws.send(json.dumps(subscribe_request))
-
-                        async for raw_msg in self._inner_messages(ws):
-                            msg: Dict[str, Any] = json.loads(raw_msg.decode('utf-8'))
-                            if "market-trade" in msg:
-                                trading_pair = msg["data"]["market"]
-                                trade_message: OrderBookMessage = ExmarketsOrderBook.trade_message_from_exchange(
-                                    msg, metadata={"market": trading_pair}
-                                )
-                                output.put_nowait(trade_message)
-                            elif "market-orderbook" in msg:
-                                trading_pair = msg["data"]["market"]
-                                order_book_message: OrderBookMessage = ExmarketsOrderBook.diff_message_from_exchange(
-                                    msg, metadata={"market": trading_pair}
-                                )
-                                output.put_nowait(order_book_message)
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    self.logger().error("Unexpected error with WebSocket connection. Retrying after 30 seconds...",
-                                        exc_info=True)
-                    await asyncio.sleep(30.0)
+        await self.listen_for_trades(ev_loop, output)
 
     async def listen_for_order_book_snapshots(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         while True:
