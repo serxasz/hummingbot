@@ -271,8 +271,8 @@ cdef class ExmarketsMarket(MarketBase):
                            data=None,
                            is_auth_required: bool = False) -> Dict[str, Any]:
         args = {
-            "timestamp": self._exmarkets_auth.make_timestamp,
-            "nonce": self._exmarkets_auth.make_nonce,
+            "timestamp": self._exmarkets_auth.make_timestamp(),
+            "nonce": self._exmarkets_auth.make_nonce(),
         }
         if params is not None:
             params.update(args)
