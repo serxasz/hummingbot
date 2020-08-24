@@ -47,7 +47,6 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
     def __init__(self, trading_pairs: Optional[List[str]] = None):
         super().__init__()
         self._trading_pairs: Optional[List[str]] = trading_pairs
-        self._symbol_map: Dict[str, Any] = None
         self._ws_running: bool = False
 
     @classmethod
@@ -74,12 +73,6 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
             market_data = await market_response.json()
             exchange_data = await exchange_response.json()
-
-            symbolMap: Dict[str, Any] = {
-                item["slug"]: item["id"]
-                for item in exchange_data["markets"]
-            }
-            self._symbol_map = symbolMap
 
             trading_pairs: Dict[str, Any] = {
                 item["slug"]: {"baseAsset": item["currency"]["code"].lower(), "quoteAsset": item["with_currency"]["code"].lower()}
@@ -200,6 +193,19 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def listen_for_trades(self, ev_loop: asyncio.BaseEventLoop, output: asyncio.Queue):
         if (self._ws_running is False):
             self._ws_running = True
+
+            symbolMap: Dict[str, Any] = {}
+            async with aiohttp.ClientSession() as client:
+                async with client.get(EXMARKETS_SYMBOLS_URL) as response:
+                    exchange_response: aiohttp.ClientResponse = response
+                    if exchange_response.status != 200:
+                        raise IOError(f"Error fetching Exmarkets exchange information. HTTP status is {exchange_response.status}.")
+                    exchange_data = await exchange_response.json()
+                    symbolMap: Dict[str, Any] = {
+                        item["slug"]: item["id"]
+                        for item in exchange_data["markets"]
+                    }
+
             while True:
                 try:
                     trading_pairs: List[str] = await self.get_trading_pairs()
@@ -215,12 +221,12 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
                                 "e": "market",
                                 "type": "bot",
                                 "chartInterval": "1m",
-                                "marketId": self._symbol_map[trading_pair]
+                                "marketId": symbolMap[trading_pair]
                             }
                             await ws.send(json.dumps(subscribe_request))
 
                         async for raw_msg in self._inner_messages(ws):
-                            msg: Dict[str, Any] = json.loads(raw_msg.decode('utf-8'))
+                            msg: Dict[str, Any] = json.loads(raw_msg)
                             if "market-trade" in msg:
                                 trading_pair = msg["data"]["market"]
                                 trade_message: OrderBookMessage = ExmarketsOrderBook.trade_message_from_exchange(

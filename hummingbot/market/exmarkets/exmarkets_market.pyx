@@ -335,7 +335,7 @@ cdef class ExmarketsMarket(MarketBase):
         balances = data.get("wallets", [])
         if len(balances) > 0:
             for balance_entry in balances:
-                asset_name = balance_entry["currency"]
+                asset_name = balance_entry["currency"].lower()
                 balance = Decimal(balance_entry["available"])
                 if balance == s_decimal_0:
                     continue
