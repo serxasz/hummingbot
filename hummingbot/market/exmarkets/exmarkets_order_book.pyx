@@ -72,8 +72,8 @@ cdef class ExmarketsOrderBook(OrderBook):
             "trade_type": float(TradeType.SELL.value) if msg["data"]["side"] == "SELL" else float(TradeType.BUY.value),
             "trade_id": millis,
             "update_id": millis,
-            "price": msg["data"]["price"],
-            "amount": msg["data"]["amount"]
+            "price": float(msg["data"]["price"]),
+            "amount": float(msg["data"]["amount"])
         }, timestamp=timestamp)
 
     @classmethod
@@ -87,8 +87,8 @@ cdef class ExmarketsOrderBook(OrderBook):
             "trade_type": float(TradeType.SELL.value) if msg["data"]["side"] == "SELL" else float(TradeType.BUY.value),
             "trade_id": ts,
             "update_id": ts,
-            "price": msg["data"]["price"],
-            "amount": msg["data"]["amount"]
+            "price": float(msg["data"]["price"]),
+            "amount": float(msg["data"]["amount"])
         }, timestamp=ts * 1e-3)
 
     @classmethod

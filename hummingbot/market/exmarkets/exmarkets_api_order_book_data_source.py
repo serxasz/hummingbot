@@ -227,13 +227,14 @@ class ExmarketsAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
                         async for raw_msg in self._inner_messages(ws):
                             msg: Dict[str, Any] = json.loads(raw_msg)
-                            if "market-trade" in msg:
+                            msgType = msg.get("type")
+                            if msgType == "market-trade":
                                 trading_pair = msg["data"]["market"]
                                 trade_message: OrderBookMessage = ExmarketsOrderBook.trade_message_from_exchange(
                                     msg, metadata={"market": trading_pair}
                                 )
                                 output.put_nowait(trade_message)
-                            elif "market-orderbook" in msg:
+                            elif msgType == "market-orderbook":
                                 trading_pair = msg["data"]["market"]
                                 order_book_message: OrderBookMessage = ExmarketsOrderBook.diff_message_from_exchange(
                                     msg, metadata={"market": trading_pair}

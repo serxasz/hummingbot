@@ -13,6 +13,7 @@ from hummingbot.core.data_type.order_book_message import (
     OrderBookMessage,
     OrderBookMessageType
 )
+from hummingbot.core.data_type.order_book_row import OrderBookRow
 from hummingbot.core.data_type.order_book_tracker import (
     OrderBookTracker,
     OrderBookTrackerDataSourceType
@@ -115,9 +116,20 @@ class ExmarketsOrderBookTracker(OrderBookTracker):
         while True:
             try:
                 message: OrderBookMessage = await message_queue.get()
+
+                bids = [
+                    OrderBookRow(float(item["price"]), float(item["amount"]), message.update_id)
+                    for item in message.content["bids"]
+                ]
+
+                asks = [
+                    OrderBookRow(float(item["price"]), float(item["amount"]), message.update_id)
+                    for item in message.content["asks"]
+                ]
+
                 if message.type is OrderBookMessageType.DIFF:
                     # Exmarkets websocket messages contain the entire order book state so they should be treated as snapshots
-                    order_book.apply_snapshot(message.bids, message.asks, message.update_id)
+                    order_book.apply_snapshot(bids, asks, message.update_id)
                     diff_messages_accepted += 1
 
                     # Output some statistics periodically.
@@ -128,7 +140,7 @@ class ExmarketsOrderBookTracker(OrderBookTracker):
                         diff_messages_accepted = 0
                     last_message_timestamp = now
                 elif message.type is OrderBookMessageType.SNAPSHOT:
-                    order_book.apply_snapshot(message.bids, message.asks, message.update_id)
+                    order_book.apply_snapshot(bids, asks, message.update_id)
                     self.logger().debug("Processed order book snapshot for %s.", trading_pair)
             except asyncio.CancelledError:
                 raise
