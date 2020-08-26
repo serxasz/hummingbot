@@ -268,7 +268,7 @@ cdef class ExmarketsMarket(MarketBase):
                            method,
                            path_url,
                            params: Optional[Dict[str, Any]] = None,
-                           data=None,
+                           data: Optional[Dict[str, Any]] = None,
                            is_auth_required: bool = False) -> Dict[str, Any]:
         args = {
             "timestamp": self._exmarkets_auth.make_timestamp(),
@@ -279,10 +279,14 @@ cdef class ExmarketsMarket(MarketBase):
         else:
             params = args
 
-        content_type = "application/json" if method == "post" else "application/x-www-form-urlencoded"
-        headers = {"Content-Type": content_type}
+        tempParams = params
+        if data is not None:
+            tempParams.update(data)
+        headers = {}
+        if method == "post":
+            headers = {"Content-Type": "application/json"}
         if is_auth_required:
-            headers.update(self._exmarkets_auth.generate_headers(method, path_url, params))
+            headers.update(self._exmarkets_auth.generate_headers(method, path_url, tempParams))
 
         url = EXMARKETS_ROOT_API + path_url
         client = await self._http_client()
@@ -303,12 +307,14 @@ cdef class ExmarketsMarket(MarketBase):
                 url=url,
                 headers=headers,
                 params=params,
-                data=ujson.dumps(data),
+                data=data is None if None else ujson.dumps(data),
                 timeout=100
             )
 
         async with response_coro as response:
             if response.status != 200:
+                message = await response.json()
+                self.logger().error(f"Error body: {str(message)}. URL: {url}")
                 raise IOError(f"Error fetching data from {url}. HTTP status is {response.status}.")
             try:
                 parsed_response = await response.json()
@@ -430,7 +436,7 @@ cdef class ExmarketsMarket(MarketBase):
         if current_tick > last_tick and len(self._in_flight_orders) > 0:
             tracked_orders = list(self._in_flight_orders.values())
             for tracked_order in tracked_orders:
-                exchange_order_id = await tracked_order.get_exchange_order_id()
+                exchange_order_id = tracked_order.exchange_order_id
                 try:
                     order_update = await self.get_order_status(exchange_order_id)
                 except ExmarketsAPIError as e:
@@ -548,10 +554,10 @@ cdef class ExmarketsMarket(MarketBase):
                 self._last_poll_timestamp = self._current_timestamp
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as e:
                 self.logger().network("Unexpected error while fetching account updates.",
                                       exc_info=True,
-                                      app_warning_msg="Could not fetch account updates from Exmarkets. "
+                                      app_warning_msg=f"Could not fetch account updates from Exmarkets. Error: {str(e)}"
                                                       "Check API key and network connection.")
                 await asyncio.sleep(0.5)
 
@@ -592,20 +598,20 @@ cdef class ExmarketsMarket(MarketBase):
         path_url = "trade/v1/orders/buy" if is_buy else "trade/v1/orders/sell"
         order_type_str = "limit" if order_type is OrderType.LIMIT else "market"
         params = {
-            "amount": f"{amount:f}",
+            "amount": f"{amount.normalize():f}",
             "market": trading_pair,
             "type": order_type_str,
         }
         if order_type is OrderType.LIMIT:
-            params["price"] = f"{price:f}"
-        exchange_order_id = await self._api_request(
+            params["price"] = f"{price.normalize():f}"
+        exchange_order = await self._api_request(
             "post",
             path_url=path_url,
-            params=params,
+            params=None,
             data=params,
             is_auth_required=True
         )
-        return str(exchange_order_id)
+        return str(exchange_order.get("id"))
 
     async def execute_buy(self,
                           order_id: str,
@@ -657,7 +663,7 @@ cdef class ExmarketsMarket(MarketBase):
                                  ))
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as e:
             self.c_stop_tracking_order(order_id)
             order_type_str = "MARKET" if order_type == OrderType.MARKET else "LIMIT"
             self.logger().network(
@@ -665,7 +671,7 @@ cdef class ExmarketsMarket(MarketBase):
                 f"{decimal_amount} {trading_pair} "
                 f"{decimal_price if order_type is OrderType.LIMIT else ''}.",
                 exc_info=True,
-                app_warning_msg=f"Failed to submit buy order to Exmarkets. Check API key and network connection."
+                app_warning_msg=f"Failed to submit buy order to Exmarkets. Error: ({str(e)}) Check API key and network connection."
             )
             self.c_trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
                                  MarketOrderFailureEvent(self._current_timestamp, order_id, order_type))
@@ -803,7 +809,6 @@ cdef class ExmarketsMarket(MarketBase):
         open_orders = [o for o in self._in_flight_orders.values() if o.is_open]
         if len(open_orders) == 0:
             return []
-
         successful_cancellations = []
         try:
             path_url = "trade/v1/orders"
