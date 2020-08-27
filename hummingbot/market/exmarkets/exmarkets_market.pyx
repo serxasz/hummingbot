@@ -274,6 +274,7 @@ cdef class ExmarketsMarket(MarketBase):
             "timestamp": self._exmarkets_auth.make_timestamp(),
             "nonce": self._exmarkets_auth.make_nonce(),
         }
+        self.logger().network(f"Making request {str(args['nonce'])} to {path_url}")
         if params is not None:
             params.update(args)
         else:
